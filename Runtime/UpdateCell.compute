@@ -1,0 +1,499 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Erosion
+#pragma kernel CalculateFD8
+#pragma kernel CalculateD4
+#pragma kernel CalculateD8
+#pragma kernel CalculateD16
+#pragma kernel CalculateDInfinite
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+struct cell
+{
+	float erosionWater;
+	float inflow;
+	float outflow;
+	float height;
+	int idPosition;
+	float2 direction;
+	float heightdiff;
+};
+RWStructuredBuffer<cell> Cells;
+RWStructuredBuffer<float> DensField;
+//Output-input
+RWStructuredBuffer<float> slopes;
+RWStructuredBuffer<float3> Position;
+RWStructuredBuffer<float3> PositionWater;
+StructuredBuffer<float3> PositionAll;
+float Solubility;
+float Abrasion;
+float DeepWaterCutOff;
+float Size;
+float SpeedFlow;
+float D1;
+float D2;
+float D3;
+
+int CalculateDirectionD4(int index, int currentLowest);
+int CalculateDirectionD8(int index, int currentLowest);
+int CalculateDirectionD16(int index, int currentLowest);
+float CalculateDensity(int other, cell current, int index);
+float3 CalculateRadius(int e0, int e1, int e2, float3 slopemag, int k);
+int ID(int x, int y);
+
+
+[numthreads(1, 1, 1)]
+void Erosion(uint3 id : SV_DispatchThreadID)
+{
+	// TODO: insert actual code here!
+	int index = id.x + (Size * id.y);
+	cell current = Cells[index];
+	float cap = Solubility * (-current.outflow + current.inflow);
+	DensField[index] = DensField[index] - Cells[index].outflow;
+	DensField[index] = DensField[index] + Cells[index].inflow;
+	DensField[index] = clamp(DensField[index], 0, 1);
+
+	float erosion = Abrasion * clamp(current.inflow + current.outflow, 0, 0.1);
+	float newTotal = current.erosionWater + erosion;
+
+	if (current.inflow + current.outflow > DeepWaterCutOff && current.heightdiff > 0.001f)
+	{
+		if (cap - newTotal < 0)
+		{
+			erosion = cap - newTotal;
+			Cells[index].erosionWater = cap;
+		}
+		else
+		{
+			Cells[index].erosionWater = newTotal;
+		}
+		if (current.idPosition != -1)
+		{
+			Cells[index].height += erosion;
+			Position[current.idPosition] += float3(0, erosion, 0);
+		}
+	}
+	if (current.idPosition != -1)
+	{
+		float value = DensField[index];
+		PositionWater[current.idPosition] = Position[current.idPosition] + float3(0, value, 0);
+
+	}
+	else if (current.idPosition == -1)
+	{
+		if (index == 0)
+		{
+			Cells[index].height = Cells[ID(id.x + 1, id.y)].height;
+		}
+		else if (index == Size - 1)
+		{
+			Cells[index].height = Cells[ID(id.x - 1, id.y)].height;
+		}
+		else if (index == (Size * Size - 1))
+		{
+			Cells[index].height = Cells[ID(id.x - 1, id.y)].height;
+		}
+		else if (index == (Size * Size - Size))
+		{
+			Cells[index].height = Cells[ID(id.x + 1, id.y)].height;
+		}
+		else if (int(id.x) == 0)
+		{
+			Cells[index].height = int(Cells[ID(id.x + 1, id.y)].height) - 10.5f;
+		}
+		else if (int(id.y) == 0)
+		{
+			Cells[index].height = int(Cells[ID(id.x, id.y + 1)].height) - 10.5f;
+		}
+		else if (int(id.y) == Size - 1)
+		{
+			Cells[index].height = int(Cells[ID(id.x, id.y - 1)].height) - 10.5f;
+		}
+		else if (int(id.x) == Size - 1)
+		{
+			Cells[index].height = int(Cells[ID(id.x - 1, id.y)].height) - 10.5f;
+		}
+	}
+	Cells[index].inflow = 0;
+	Cells[index].outflow = 0;
+	Cells[index].heightdiff = 0;
+}
+
+[numthreads(1, 1, 1)]
+void CalculateD8Ex(uint3 id : SV_DispatchThreadID)
+{
+	int index = id.x + (Size * id.y);
+	cell current = Cells[index];
+	if (current.idPosition != -1 && DensField[index] > 0.01f)
+	{
+		float percentageY = current.direction.y;
+		float percentageX = current.direction.x;
+		//For D4
+		int i0 = index - 1;
+		int i1 = index + 1;
+		int j0 = index - Size;
+		int j1 = index + Size;
+		if (percentageY < -0.01f)
+		{
+			Cells[index].outflow += CalculateDensity(i0, current, index);
+			Cells[i0].inflow += CalculateDensity(i0, current, index);
+		}
+		else if (percentageY > 0.01f)
+		{
+			Cells[index].outflow += CalculateDensity(i1, current, index);
+			Cells[i1].inflow += CalculateDensity(i1, current, index);
+		}
+		if (percentageX < -0.01f)
+		{
+			Cells[index].outflow += CalculateDensity(j0, current, index);
+			Cells[j0].inflow += CalculateDensity(j0, current, index);
+		}
+		else if (percentageX > 0.01f)
+		{
+			Cells[index].outflow += CalculateDensity(j1, current, index);
+			Cells[j1].inflow += CalculateDensity(j1, current, index);
+		}
+	}
+}
+
+[numthreads(1, 1, 1)]
+void CalculateFD8(uint3 id : SV_DispatchThreadID)
+{
+	int index = id.x + (Size * id.y);
+	int neigh[8];
+	int i = 0;
+	{
+		if (Cells[index + 1].height < Cells[index].height) neigh[i] = index + 1; else neigh[i] = -1;
+		i++;
+		if (Cells[index - 1].height < Cells[index].height) neigh[i] = index - 1; else neigh[i] = -1;
+		i++;
+		if (Cells[index - Size].height < Cells[index].height) neigh[i] = index - Size; else neigh[i] = -1;
+		i++;
+		if (Cells[index + Size].height < Cells[index].height) neigh[i] = index + Size; else neigh[i] = -1;
+		i++;
+		if (Cells[index + 1 + Size].height < Cells[index].height) neigh[i] = index + 1 + Size; else neigh[i] = -1;
+		i++;
+		if (Cells[index - 1 + Size].height < Cells[index].height) neigh[i] = index - 1 + Size; else neigh[i] = -1;
+		i++;
+		if (Cells[index + 1 - Size].height < Cells[index].height) neigh[i] = index + 1 - Size; else neigh[i] = -1;
+		i++;
+		if (Cells[index - 1 - Size].height < Cells[index].height) neigh[i] = index - 1 - Size; else neigh[i] = -1;
+		i++;
+	}
+	float total = 0;
+	float values[8];
+	for (int k = 0; k < 8; k++)
+	{
+		if (neigh[k] == -1) continue;
+
+		float heightvalue = (Cells[index].height) - (Cells[neigh[k]].height);
+		if (k < 4)
+		{
+			values[k] = 0.5f * tan(heightvalue / D1);
+		}
+		else
+		{
+			values[k] = 0.35f * tan(heightvalue / D2);
+		}
+		Cells[index].heightdiff += heightvalue;
+		total += values[k];
+	}
+	float outflo = DensField[index] * (SpeedFlow / 30);
+	float t = 0;
+	for (int j = 0; j < 8; j++)
+	{
+		if (neigh[j] == -1) continue;
+		float outflow = outflo * (values[j] / total);
+		Cells[neigh[j]].inflow += outflow;
+		t += outflow;
+	}
+	Cells[index].outflow += t;
+	if (t == 0 && DensField[index] > 0) Cells[index].outflow += (SpeedFlow / 30);
+}
+
+[numthreads(1, 1, 1)]
+void CalculateD16(uint3 id : SV_DispatchThreadID)
+{
+	int index = id.x + (Size * id.y);
+	cell current = Cells[index];
+	if (Cells[index].idPosition == -1)
+	{
+		DensField[index] = 0;
+		return;
+	}
+	int idx = CalculateDirectionD4(index, index);
+	int idxd4 = idx;
+	idx = CalculateDirectionD8(index, idx);
+	int idxd8 = idx;
+	idx = CalculateDirectionD16(index, idx);
+
+	if (index == idx)
+	{
+		Cells[index].direction = float2(0, 0);
+		return;
+	}
+
+	float amount = D1;
+	//TODO Look into something worng/ not right feeling
+	if (idx != idxd8)
+	{
+		amount = D1;
+
+	}
+	else if (idx != idxd4)
+	{
+		amount = D1;
+	}
+	if (DensField[index] > 0)
+	{
+		float x = CalculateDensity(idx, current, index);
+		Cells[idx].inflow += x * amount;
+		Cells[index].outflow += x * amount;
+	}
+
+	Cells[index].heightdiff += Cells[index].height - Cells[idx].height;
+	//no need to normalize
+//	Cells[index].direction = t1;
+}
+
+[numthreads(1, 1, 1)]
+void CalculateDInfinite(uint3 id : SV_DispatchThreadID)
+{
+	int i = id.x;
+	int j = id.y;
+	int index = ID(i, j);
+	if (Cells[index].idPosition == -1) return;
+	int e1[8] = {
+		ID(i + 1,j) ,
+		ID(i,j - 1) ,
+		ID(i ,j - 1) ,
+		ID(i - 1,j) ,
+		ID(i - 1,j) ,
+		ID(i ,j + 1) ,
+		ID(i,j + 1) ,
+		ID(i + 1,j)
+	};
+	int e2[8] = {
+		ID(i + 1,j - 1) ,
+		ID(i + 1,j - 1) ,
+		ID(i - 1,j - 1) ,
+		ID(i - 1,j - 1) ,
+		ID(i - 1,j + 1) ,
+		ID(i - 1,j + 1) ,
+		ID(i + 1,j + 1) ,
+		ID(i + 1,j + 1)
+	};
+	int direction[9] = {
+		ID(i + 1,j) ,
+		ID(i + 1,j - 1) ,
+		ID(i,j - 1) ,
+		ID(i - 1,j - 1) ,
+		ID(i - 1,j) ,
+		ID(i - 1,j + 1) ,
+		ID(i,j + 1) ,
+		ID(i + 1,j + 1),
+		ID(i + 1,j)
+	};
+	int ac[8] = { 0,1,1,2,2,3,3,4 };
+	int af[8] = { 1,-1,1,-1,1,-1,1,-1 };
+
+	float3 slope = { -1000,0,-1 };
+	int x = 0;
+	for (int k = 0; k < 8; k++)
+	{
+		slope = CalculateRadius(index, e1[k], e2[k], slope, k);
+	}
+	if (int(slope.z) == -1) return;
+	slope.y = af[int(slope.z)] * slope.y + ac[int(slope.z)] * (3.14159265f) / 2.f;
+
+	//outflow and inflow
+	float angle = 3.14159265f / 4.f;
+	for (int l = 0; l < 8; l++)
+	{
+		if (slope.y / angle < 1)
+		{
+			if (DensField[index] > 0)
+			{
+				cell current = Cells[index];
+				float a1 = angle - slope.y;
+				float a2 = slope.y - (angle - 3.14159265f / 4.f);
+				float proportion1 = a1 / (a1 + a2);
+				float proportion2 = a2 / (a1 + a2);
+				float x1 = CalculateDensity(direction[l], current, index);
+				float x2 = CalculateDensity(direction[l + 1], current, index);
+				float outflow1 = x1 * clamp(proportion1, 0, 1);
+				float outflow2 = x2 * clamp(proportion2, 0, 1);
+				float amount1 = 1;
+				float amount2 = 1;
+				if (l % 2 == 0)
+				{
+					amount2 = D1;
+				}
+				else
+				{
+					amount1 = D1;
+				}
+				Cells[direction[l]].inflow += outflow1 * amount1;
+				Cells[direction[l + 1]].inflow += outflow2 * amount2;
+				Cells[index].outflow += (outflow1 * amount1 + outflow2 * amount2);
+
+				Cells[index].heightdiff += abs(Cells[index].height - Cells[direction[l]].height);
+				Cells[index].heightdiff += abs(Cells[index].height - Cells[direction[l + 1]].height);
+			}
+
+			//float ca = cos(3.14159265f + slope.y);
+			//float sa = sin(3.14159265f + slope.y);
+			//float2 deg = float2(0.f, 0.1f);
+
+			//Cells[index].direction = float2 (-(ca * deg.x - sa * deg.y), (sa * deg.x - ca * deg.y));
+			return;
+		}
+		angle += 3.14159265f / 4.f;
+	}
+}
+
+[numthreads(1, 1, 1)]
+void CalculateD8(uint3 id : SV_DispatchThreadID)
+{
+	int index = id.x + (Size * id.y);
+	cell current = Cells[index];
+	if (Cells[index].idPosition == -1)
+	{
+		DensField[index] = 0;
+		return;
+	}
+	int idx = CalculateDirectionD4(index, index);
+	int idxd4 = idx;
+	idx = CalculateDirectionD8(index, idx);
+	if (index == idx)
+	{
+		Cells[index].direction = float2(0, 0);
+		return;
+	}
+	float2 t1 = float2(PositionAll[idx].x, PositionAll[idx].z) -
+		float2(PositionAll[index].x, PositionAll[index].z);
+	float amount = D2;
+	if (idx != idxd4)
+	{
+		amount =  D1;
+	}
+	if (DensField[index] > 0)
+	{
+		float x = CalculateDensity(idx, current, index);
+		Cells[idx].inflow += x * amount;
+		Cells[index].outflow += x * amount;
+	}
+	Cells[index].heightdiff += Cells[index].height - Cells[idx].height;
+	//no need to normalize
+	Cells[index].direction = t1;
+}
+
+[numthreads(1, 1, 1)]
+void CalculateD4(uint3 id : SV_DispatchThreadID)
+{
+	int index = id.x + (Size * id.y);
+	cell current = Cells[index];
+	if (Cells[index].idPosition == -1)
+	{
+		DensField[index] = 0;
+		return;
+	}
+	int idx = CalculateDirectionD4(index, index);
+	if (index == idx)
+	{
+		Cells[index].direction = float2(0, 0);
+		return;
+	}
+	float2 t1 = float2(PositionAll[idx].x, PositionAll[idx].z) -
+		float2(PositionAll[index].x, PositionAll[index].z);
+	float amount = 1;
+	if (DensField[index] > 0)
+	{
+		float x = CalculateDensity(idx, current, index);
+		Cells[idx].inflow += x * amount;
+		Cells[index].outflow += x * amount;
+	}
+
+	//no need to normalize
+	Cells[index].direction = t1;
+
+}
+
+float3 CalculateRadius(int e0, int e1, int e2, float3 slopemag, int k)
+{
+	float s1 = (Cells[e0].height - Cells[e1].height) / D1;
+	float s2 = (Cells[e1].height - Cells[e2].height) / D1;
+
+	if (s1 < 0 && s2 < 0) return slopemag;
+
+	float r = atan(s2 / s1);
+	float s = 0;
+	if (r < 0)
+	{
+		r = 0;
+		s = s1;
+	}
+	else if (r > atan(1))
+	{
+		r = atan(1);
+		s = (Cells[e0].height - Cells[e2].height) / pow(D1 * D1 + D2 * D2, 0.5f);
+	}
+	else
+	{
+		s = pow((s1 * s1 + s2 * s2), 0.5f);
+	}
+
+	if (slopemag.x < s || slopemag.x == -1000)
+	{
+		return float3(s, r, k);
+	}
+	return slopemag;
+}
+
+int ID(int x, int y)
+{
+	return x + (Size * y);
+}
+
+int CalculateDirectionD4(int index, int currentLowest)
+{
+	int id = currentLowest;
+	if (Cells[index + 1].height < Cells[id].height) id = index + 1;
+	if (Cells[index - 1].height < Cells[id].height) id = index - 1;
+	if (Cells[index + Size].height < Cells[id].height) id = index + Size;
+	if (Cells[index - Size].height < Cells[id].height) id = index - Size;
+	return id;
+}
+
+int CalculateDirectionD8(int index, int currentLowest)
+{
+	int id = currentLowest;
+	if (Cells[index + 1 + Size].height < Cells[id].height) id = index + 1 + Size;
+	if (Cells[index - 1 + Size].height < Cells[id].height) id = index - 1 + Size;
+	if (Cells[index + 1 - Size].height < Cells[id].height) id = index + 1 - Size;
+	if (Cells[index - 1 - Size].height < Cells[id].height) id = index - 1 - Size;
+	return id;
+}
+
+int CalculateDirectionD16(int index, int currentLowest)
+{
+	int id = currentLowest;
+	if (Cells[index + 2 + Size].height < Cells[id].height) id = index + 2 + Size;
+	if (Cells[index - 2 + Size].height < Cells[id].height) id = index - 2 + Size;
+	if (Cells[index + 2 - Size].height < Cells[id].height) id = index + 2 - Size;
+	if (Cells[index - 2 - Size].height < Cells[id].height) id = index - 2 - Size;
+	if (Cells[index + 1 - Size * 2].height < Cells[id].height) id = index + 1 - Size * 2;
+	if (Cells[index - 1 - Size * 2].height < Cells[id].height) id = index - 1 - Size * 2;
+	if (Cells[index + 1 + Size * 2].height < Cells[id].height) id = index + 1 + Size * 2;
+	if (Cells[index - 1 + Size * 2].height < Cells[id].height) id = index - 1 + Size * 2;
+	return id;
+}
+
+float CalculateDensity(int other, cell current, int index)
+{
+	float diff = abs((current.height + DensField[index]) - (Cells[other].height + DensField[other])) * SpeedFlow ;
+	//float d = DensField[index] - diff;
+	//if (d < 0) d = DensField[index]; else d = diff;
+	//Cells[other].inflow += diff;
+	return diff;
+}
