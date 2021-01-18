@@ -75,6 +75,7 @@ public class Grid : MonoBehaviour
         Shader.SetFloat("Abrasion", Abrasion);
         Shader.SetFloat("DeepWaterCutOff", DeepWaterCutoff);
         Shader.SetFloat("SpeedFlow", SpeedFlow);
+        Shader.SetFloat("BoundSize", BoundSize);
         Shader.SetFloat("Size", Size + BoundSize * 2);
     }
 
@@ -94,7 +95,7 @@ public class Grid : MonoBehaviour
                     || k >= Size + BoundSize)
                 {
                     Cells.Add(new Cell(count, k, i, new Vector3(0, 0, 0), -1));
-                    Items[count].Height = -100;
+                    Items[count].Height = -10;
                 }
                 else
                 {

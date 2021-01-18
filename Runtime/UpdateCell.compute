@@ -33,6 +33,7 @@ float SpeedFlow;
 float D1;
 float D2;
 float D3;
+int BoundSize;
 
 int CalculateDirectionD4(int index, int currentLowest);
 int CalculateDirectionD8(int index, int currentLowest);
@@ -83,35 +84,35 @@ void Erosion(uint3 id : SV_DispatchThreadID)
 	{
 		if (index == 0)
 		{
-			Cells[index].height = Cells[ID(id.x + 1, id.y)].height;
+			Cells[index].height = Cells[ID(id.x + BoundSize, id.y)].height;
 		}
 		else if (index == Size - 1)
 		{
-			Cells[index].height = Cells[ID(id.x - 1, id.y)].height;
+			Cells[index].height = Cells[ID(id.x - BoundSize, id.y)].height;
 		}
 		else if (index == (Size * Size - 1))
 		{
-			Cells[index].height = Cells[ID(id.x - 1, id.y)].height;
+			Cells[index].height = Cells[ID(id.x - BoundSize, id.y)].height;
 		}
 		else if (index == (Size * Size - Size))
 		{
-			Cells[index].height = Cells[ID(id.x + 1, id.y)].height;
+			Cells[index].height = Cells[ID(id.x + BoundSize, id.y)].height;
 		}
 		else if (int(id.x) == 0)
 		{
-			Cells[index].height = int(Cells[ID(id.x + 1, id.y)].height) - 10.5f;
+			Cells[index].height = int(Cells[ID(id.x + BoundSize, id.y)].height) - 1.5f;
 		}
 		else if (int(id.y) == 0)
 		{
-			Cells[index].height = int(Cells[ID(id.x, id.y + 1)].height) - 10.5f;
+			Cells[index].height = int(Cells[ID(id.x, id.y + BoundSize)].height) - 1.5f;
 		}
 		else if (int(id.y) == Size - 1)
 		{
-			Cells[index].height = int(Cells[ID(id.x, id.y - 1)].height) - 10.5f;
+			Cells[index].height = int(Cells[ID(id.x, id.y - BoundSize)].height) - 1.5f;
 		}
 		else if (int(id.x) == Size - 1)
 		{
-			Cells[index].height = int(Cells[ID(id.x - 1, id.y)].height) - 10.5f;
+			Cells[index].height = int(Cells[ID(id.x - BoundSize, id.y)].height) - 1.5f;
 		}
 	}
 	Cells[index].inflow = 0;
@@ -208,7 +209,7 @@ void CalculateFD8(uint3 id : SV_DispatchThreadID)
 		t += outflow;
 	}
 	Cells[index].outflow += t;
-	if (t == 0 && LiquidField[index] > 0) Cells[index].outflow += (SpeedFlow / 30);
+	if (t == 0 && LiquidField[index] > 0) Cells[index].outflow += (SpeedFlow * 2);
 }
 
 [numthreads(1, 1, 1)]
