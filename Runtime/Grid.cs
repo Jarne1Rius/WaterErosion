@@ -36,7 +36,7 @@ public class Grid : MonoBehaviour
     protected int AmountUpdate = 0;
     protected TimeSpan DurationUpdate = TimeSpan.Zero;
 
-    private bool t;
+    private bool m_ShowDirections;
     //Parameters
     public bool WriteToFile { get; set; }
     public int Size { get; set; }
@@ -123,7 +123,7 @@ public class Grid : MonoBehaviour
         float distance1 = (new Vector2(Cells[(Size + BoundSize * 2) * BoundSize + BoundSize + 1].StartPosition.x, Cells[(Size + BoundSize * 2) * BoundSize + BoundSize + 1].StartPosition.z) -
                            new Vector2(Cells[(Size + BoundSize * 2) * BoundSize + BoundSize + 2].StartPosition.x, Cells[(Size + BoundSize * 2) * BoundSize + BoundSize + 2].StartPosition.z)).magnitude;
         float distance2 = Mathf.Sqrt(distance1 * distance1 + distance1 * distance1);
-        float distance3 = Mathf.Sqrt((distance1  + distance1) * (distance1 + distance1) + distance1 * distance1);
+        float distance3 = Mathf.Sqrt((distance1 + distance1) * (distance1 + distance1) + distance1 * distance1);
         Shader.SetFloat("D1", distance1);
         Shader.SetFloat("D2", distance2);
         Shader.SetFloat("D3", distance3);
@@ -144,10 +144,9 @@ public class Grid : MonoBehaviour
 
     public virtual void Update()
     {
-        if (!t)
+        if (!m_ShowDirections)
         {
-            StartCoroutine(Erode());
-            StartCoroutine(ShowDirectionsAndAmount());
+            //StartCoroutine(Erode());
         }
     }
     #region DensityField for future   
@@ -325,6 +324,7 @@ public class Grid : MonoBehaviour
     protected virtual void UpdateFlow()
     {
         AmountUpdate++;
+        if (m_ShowDirections) WaterBuffer.GetData(Items);
         PositionBuffer.GetData(m_PosStructure);
         PositionWaterBuffer.GetData(m_PosStructureWater);
 
@@ -352,7 +352,7 @@ public class Grid : MonoBehaviour
         writer.Close();
     }
 
-    IEnumerator Erode()
+    public virtual IEnumerator Erode()
     {
         float time = 0;
         while (true)
@@ -372,11 +372,11 @@ public class Grid : MonoBehaviour
         }
     }
 
-    protected IEnumerator ShowDirectionsAndAmount()
+    public IEnumerator ShowDirectionsAndAmount()
     {
-        t = true;
+        m_ShowDirections = true;
         //yield break;
-        //while (true)
+        while (true)
         {
             int i = 0;
             foreach (Cell cell in Cells)
@@ -384,14 +384,14 @@ public class Grid : MonoBehaviour
                 if (cell.IdPosition != -1)
                 {
                     Vector2 neVector2 = Items[cell.ID].Direction;
-                    float dens = LiquidField[cell.ID];
+                    float liquid = LiquidField[cell.ID];
                     // if (dens > 0.00001f)
                     {
                         //  neVector2 *= 0.1f;
                         //Debug.Log(neVector2);
                         //Debug.DrawRay(cell.StartPosition, new Vector3(cell.Direction.x, 0f, cell.Direction.z), Color.red, Time.deltaTime);
                         Debug.DrawRay(m_PosStructure[cell.IdPosition], new Vector3(neVector2.x, 0f, neVector2.y), Color.red, Time.deltaTime);
-                        Debug.DrawRay(m_PosStructure[cell.IdPosition], new Vector3(0, dens, 0), Color.black, Time.deltaTime);
+                        Debug.DrawRay(m_PosStructure[cell.IdPosition], new Vector3(0, liquid, 0), Color.black, Time.deltaTime);
                         i++;
                         //yield return new WaitForSeconds(1f);
                     }

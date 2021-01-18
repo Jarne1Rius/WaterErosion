@@ -12,8 +12,8 @@ public class D4 : Grid
     private int m_KernelErosion = 0;
     private int m_KernelDirection = 0;
     private int m_SizeForShader = 0;
-    
-    public void SetParameters( ComputeShader shader, string pathToWrite, float abrasion, float solubility, float deepWaterCutOff, float speedFlow)
+
+    public void SetParameters(ComputeShader shader, string pathToWrite, float abrasion, float solubility, float deepWaterCutOff, float speedFlow)
     {
         Shader = shader;
         Path = pathToWrite;
@@ -39,8 +39,6 @@ public class D4 : Grid
         Shader.SetBuffer(m_KernelDirection, "Cells", CellBuffer);
         m_SizeForShader = Size + BoundSize * 2;
 
-        StartCoroutine(Erode());
-        StartCoroutine(ShowDirectionsAndAmount());
     }
 
     protected override void UpdateFlow()
@@ -51,9 +49,10 @@ public class D4 : Grid
         base.UpdateFlow();
     }
 
-    IEnumerator Erode()
+    public override IEnumerator Erode()
     {
-        float time = 0; 
+
+        float time = 0;
         while (true)
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -65,7 +64,7 @@ public class D4 : Grid
             DurationUpdate += stopwatch.Elapsed;
             if (time > 1)
             {
-                Debug.Log(stopwatch.Elapsed + " - " + stopwatch.ElapsedMilliseconds );
+                Debug.Log(stopwatch.Elapsed + " - " + stopwatch.ElapsedMilliseconds);
                 time--;
             }
 

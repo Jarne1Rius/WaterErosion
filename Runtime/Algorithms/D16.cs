@@ -19,6 +19,7 @@ public class D16 : Grid
         DeepWaterCutoff = deepWaterCutOff;
         SpeedFlow = speedFlow;
     }
+
     public override void Init(List<List<AlgorithmTypeFlow.Point>> vectors)
     {
         Name = "D16";
@@ -36,9 +37,6 @@ public class D16 : Grid
         Shader.SetBuffer(m_KernelDirection, "PositionAll", PositionAllBuffer);
         Shader.SetBuffer(m_KernelDirection, "Cells", CellBuffer);
         m_SizeForShader = Size + BoundSize * 2;
-
-        StartCoroutine(Erode());
-        StartCoroutine(ShowDirectionsAndAmount());
     }
 
     protected override void UpdateFlow()
@@ -50,7 +48,7 @@ public class D16 : Grid
     }
 
 
-    IEnumerator Erode()
+    public override IEnumerator Erode()
     {
         float time = 0;
         while (true)

@@ -37,8 +37,6 @@ public class D8 : Grid
         Shader.SetBuffer(m_KernelDirection, "Cells", CellBuffer);
         m_SizeForShader = Size + BoundSize * 2;
 
-        StartCoroutine(Erode());
-        StartCoroutine(ShowDirectionsAndAmount());
     }
 
     protected override void UpdateFlow()
@@ -50,8 +48,8 @@ public class D8 : Grid
     }
 
 
-    IEnumerator Erode()
-    {
+    public override IEnumerator Erode()
+    { 
         float time = 0;
         while (true)
         {

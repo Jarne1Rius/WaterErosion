@@ -20,18 +20,19 @@ public class AlgorithmTypeFlow : MonoBehaviour
         public Vector3 Position;
     }
 
-    [SerializeField] private TypeOfAlgorithm m_TypeOfAlgorithm;
+    [SerializeField] private TypeOfAlgorithm m_TypeOfAlgorithm = TypeOfAlgorithm.D8;
     [SerializeField] private MeshFilter m_WaterMesh = null;
     [SerializeField] private bool m_ApplyTransformMatrix = false;
     [SerializeField] private bool m_WriteTimeToFile = false;
 
     [Header("Algorithm parameters")]
-    [SerializeField] protected ComputeShader m_Shader;
-    [SerializeField] protected string m_Path = "Assets/Test.txt";
-    [SerializeField] protected float m_Abrasion = 0.001f;
-    [SerializeField] protected float m_Solubility = 0.001f;
-    [SerializeField] protected float m_DeepWaterCutoff = 0.01f;
-    [SerializeField] protected float m_SpeedFlow = 30.0f;
+    [SerializeField] private ComputeShader m_Shader = null;
+    [SerializeField] private string m_Path = "Assets/Test.txt";
+    [SerializeField] private bool m_ShowDirectionsAndLiquid = false;
+    [SerializeField] private float m_Abrasion = 0.001f;
+    [SerializeField] private float m_Solubility = 0.001f;
+    [SerializeField] private float m_DeepWaterCutoff = 0.01f;
+    [SerializeField] private float m_SpeedFlow = 0.5f;
     private MeshFilter m_SurfaceMesh;
     private readonly List<List<Point>> m_VectorPos = new List<List<Point>>();
 
@@ -57,8 +58,11 @@ public class AlgorithmTypeFlow : MonoBehaviour
         newgrid.Size = m_VectorPos.Count;
         newgrid.BoundSize = 1;
         newgrid.Init(m_VectorPos);
+        if (m_ShowDirectionsAndLiquid)
+            StartCoroutine(newgrid.ShowDirectionsAndAmount());
+        StartCoroutine(newgrid.Erode());
     }
-
+    
     private void SetAlgorithm()
     {
         switch (m_TypeOfAlgorithm)

@@ -198,7 +198,7 @@ void CalculateFD8(uint3 id : SV_DispatchThreadID)
 		Cells[index].heightdiff += heightvalue;
 		total += values[k];
 	}
-	float outflo = DensField[index] * (SpeedFlow / 30);
+	float outflo = DensField[index] * (SpeedFlow*2);
 	float t = 0;
 	for (int j = 0; j < 8; j++)
 	{
@@ -237,12 +237,11 @@ void CalculateD16(uint3 id : SV_DispatchThreadID)
 	//TODO Look into something worng/ not right feeling
 	if (idx != idxd8)
 	{
-		amount = D1;
-
+		amount = D1 / D3;
 	}
 	else if (idx != idxd4)
 	{
-		amount = D1;
+		amount = D1 / D2;
 	}
 	if (DensField[index] > 0)
 	{
@@ -323,8 +322,8 @@ void CalculateDInfinite(uint3 id : SV_DispatchThreadID)
 				float x2 = CalculateDensity(direction[l + 1], current, index);
 				float outflow1 = x1 * clamp(proportion1, 0, 1);
 				float outflow2 = x2 * clamp(proportion2, 0, 1);
-				float amount1 = 1;
-				float amount2 = 1;
+				float amount1 = D1 / D2;
+				float amount2 = D1 / D2;
 				if (l % 2 == 0)
 				{
 					amount2 = D1;
@@ -372,10 +371,10 @@ void CalculateD8(uint3 id : SV_DispatchThreadID)
 	}
 	float2 t1 = float2(PositionAll[idx].x, PositionAll[idx].z) -
 		float2(PositionAll[index].x, PositionAll[index].z);
-	float amount = D2;
+	float amount = D1;
 	if (idx != idxd4)
 	{
-		amount =  D1;
+		amount = D1 / D2;
 	}
 	if (DensField[index] > 0)
 	{
@@ -491,7 +490,7 @@ int CalculateDirectionD16(int index, int currentLowest)
 
 float CalculateDensity(int other, cell current, int index)
 {
-	float diff = abs((current.height + DensField[index]) - (Cells[other].height + DensField[other])) * SpeedFlow ;
+	float diff = abs((current.height + DensField[index]) - (Cells[other].height + DensField[other])) * SpeedFlow;
 	//float d = DensField[index] - diff;
 	//if (d < 0) d = DensField[index]; else d = diff;
 	//Cells[other].inflow += diff;

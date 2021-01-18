@@ -37,8 +37,6 @@ public class FD8 : Grid
 
         m_SizeForShader = Size + BoundSize * 2;
 
-        StartCoroutine(Erode());
-        StartCoroutine(ShowDirectionsAndAmount());
     }
 
     protected override void UpdateFlow()
@@ -49,7 +47,7 @@ public class FD8 : Grid
         base.UpdateFlow();
     }
 
-    IEnumerator Erode()
+    public override IEnumerator Erode()
     {
         float time = 0;
         while (true)

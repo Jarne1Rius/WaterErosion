@@ -35,8 +35,6 @@ public class DInfinite : Grid
         Shader.SetBuffer(m_KernelErosion, "PositionWater", PositionWaterBuffer);
         m_SizeForShader = Size + BoundSize * 2;
 
-        StartCoroutine(Erode());
-        StartCoroutine(ShowDirectionsAndAmount());
     }
 
     protected override void UpdateFlow()
@@ -48,7 +46,7 @@ public class DInfinite : Grid
     }
 
 
-    IEnumerator Erode()
+    public override IEnumerator Erode()
     {
         float time = 0;
         while (true)
