@@ -29,6 +29,7 @@ public class AlgorithmTypeFlow : MonoBehaviour
     [SerializeField] private ComputeShader m_Shader = null;
     [SerializeField] private string m_Path = "Assets/Test.txt";
     [SerializeField] private bool m_ShowDirectionsAndLiquid = false;
+    [SerializeField] private bool m_ShowTime = false;
     [SerializeField] private float m_Abrasion = 0.001f;
     [SerializeField] private float m_Solubility = 0.001f;
     [SerializeField] private float m_DeepWaterCutoff = 0.01f;
@@ -69,23 +70,23 @@ public class AlgorithmTypeFlow : MonoBehaviour
         {
             case TypeOfAlgorithm.D8:
                 D8 d8 = gameObject.AddComponent<D8>();
-                d8.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow);
+                d8.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow, m_ShowTime);
                 break;
             case TypeOfAlgorithm.D4:
                 D4 d4 = gameObject.AddComponent<D4>();
-                d4.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow);
+                d4.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow, m_ShowTime);
                 break;
             case TypeOfAlgorithm.D16:
                 D16 d16 = gameObject.AddComponent<D16>();
-                d16.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow);
+                d16.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow, m_ShowTime);
                 break;
             case TypeOfAlgorithm.FD8:
                 FD8 fd8 = gameObject.AddComponent<FD8>();
-                fd8.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow);
+                fd8.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow, m_ShowTime);
                 break;
             case TypeOfAlgorithm.DInfinite:
                 DInfinite dInfinite = gameObject.AddComponent<DInfinite>();
-                dInfinite.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow);
+                dInfinite.SetParameters(m_Shader, m_Path, m_Abrasion, m_Solubility, m_DeepWaterCutoff, m_SpeedFlow, m_ShowTime);
 
                 break;
         }

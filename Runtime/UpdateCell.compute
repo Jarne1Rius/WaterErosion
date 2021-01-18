@@ -19,7 +19,7 @@ struct cell
 	float heightdiff;
 };
 RWStructuredBuffer<cell> Cells;
-RWStructuredBuffer<float> DensField;
+RWStructuredBuffer<float> LiquidField;
 //Output-input
 RWStructuredBuffer<float> slopes;
 RWStructuredBuffer<float3> Position;
@@ -37,7 +37,7 @@ float D3;
 int CalculateDirectionD4(int index, int currentLowest);
 int CalculateDirectionD8(int index, int currentLowest);
 int CalculateDirectionD16(int index, int currentLowest);
-float CalculateDensity(int other, cell current, int index);
+float CalculateLiquidAmount(int other, cell current, int index);
 float3 CalculateRadius(int e0, int e1, int e2, float3 slopemag, int k);
 int ID(int x, int y);
 
@@ -49,9 +49,9 @@ void Erosion(uint3 id : SV_DispatchThreadID)
 	int index = id.x + (Size * id.y);
 	cell current = Cells[index];
 	float cap = Solubility * (-current.outflow + current.inflow);
-	DensField[index] = DensField[index] - Cells[index].outflow;
-	DensField[index] = DensField[index] + Cells[index].inflow;
-	DensField[index] = clamp(DensField[index], 0, 1);
+	LiquidField[index] = LiquidField[index] - Cells[index].outflow;
+	LiquidField[index] = LiquidField[index] + Cells[index].inflow;
+	LiquidField[index] = clamp(LiquidField[index], 0, 1);
 
 	float erosion = Abrasion * clamp(current.inflow + current.outflow, 0, 0.1);
 	float newTotal = current.erosionWater + erosion;
@@ -75,7 +75,7 @@ void Erosion(uint3 id : SV_DispatchThreadID)
 	}
 	if (current.idPosition != -1)
 	{
-		float value = DensField[index];
+		float value = LiquidField[index];
 		PositionWater[current.idPosition] = Position[current.idPosition] + float3(0, value, 0);
 
 	}
@@ -124,7 +124,7 @@ void CalculateD8Ex(uint3 id : SV_DispatchThreadID)
 {
 	int index = id.x + (Size * id.y);
 	cell current = Cells[index];
-	if (current.idPosition != -1 && DensField[index] > 0.01f)
+	if (current.idPosition != -1 && LiquidField[index] > 0.01f)
 	{
 		float percentageY = current.direction.y;
 		float percentageX = current.direction.x;
@@ -135,23 +135,23 @@ void CalculateD8Ex(uint3 id : SV_DispatchThreadID)
 		int j1 = index + Size;
 		if (percentageY < -0.01f)
 		{
-			Cells[index].outflow += CalculateDensity(i0, current, index);
-			Cells[i0].inflow += CalculateDensity(i0, current, index);
+			Cells[index].outflow += CalculateLiquidAmount(i0, current, index);
+			Cells[i0].inflow += CalculateLiquidAmount(i0, current, index);
 		}
 		else if (percentageY > 0.01f)
 		{
-			Cells[index].outflow += CalculateDensity(i1, current, index);
-			Cells[i1].inflow += CalculateDensity(i1, current, index);
+			Cells[index].outflow += CalculateLiquidAmount(i1, current, index);
+			Cells[i1].inflow += CalculateLiquidAmount(i1, current, index);
 		}
 		if (percentageX < -0.01f)
 		{
-			Cells[index].outflow += CalculateDensity(j0, current, index);
-			Cells[j0].inflow += CalculateDensity(j0, current, index);
+			Cells[index].outflow += CalculateLiquidAmount(j0, current, index);
+			Cells[j0].inflow += CalculateLiquidAmount(j0, current, index);
 		}
 		else if (percentageX > 0.01f)
 		{
-			Cells[index].outflow += CalculateDensity(j1, current, index);
-			Cells[j1].inflow += CalculateDensity(j1, current, index);
+			Cells[index].outflow += CalculateLiquidAmount(j1, current, index);
+			Cells[j1].inflow += CalculateLiquidAmount(j1, current, index);
 		}
 	}
 }
@@ -198,7 +198,7 @@ void CalculateFD8(uint3 id : SV_DispatchThreadID)
 		Cells[index].heightdiff += heightvalue;
 		total += values[k];
 	}
-	float outflo = DensField[index] * (SpeedFlow*2);
+	float outflo = LiquidField[index] * (SpeedFlow*2);
 	float t = 0;
 	for (int j = 0; j < 8; j++)
 	{
@@ -208,7 +208,7 @@ void CalculateFD8(uint3 id : SV_DispatchThreadID)
 		t += outflow;
 	}
 	Cells[index].outflow += t;
-	if (t == 0 && DensField[index] > 0) Cells[index].outflow += (SpeedFlow / 30);
+	if (t == 0 && LiquidField[index] > 0) Cells[index].outflow += (SpeedFlow / 30);
 }
 
 [numthreads(1, 1, 1)]
@@ -218,7 +218,7 @@ void CalculateD16(uint3 id : SV_DispatchThreadID)
 	cell current = Cells[index];
 	if (Cells[index].idPosition == -1)
 	{
-		DensField[index] = 0;
+		LiquidField[index] = 0;
 		return;
 	}
 	int idx = CalculateDirectionD4(index, index);
@@ -243,9 +243,9 @@ void CalculateD16(uint3 id : SV_DispatchThreadID)
 	{
 		amount = D1 / D2;
 	}
-	if (DensField[index] > 0)
+	if (LiquidField[index] > 0)
 	{
-		float x = CalculateDensity(idx, current, index);
+		float x = CalculateLiquidAmount(idx, current, index);
 		Cells[idx].inflow += x * amount;
 		Cells[index].outflow += x * amount;
 	}
@@ -311,15 +311,15 @@ void CalculateDInfinite(uint3 id : SV_DispatchThreadID)
 	{
 		if (slope.y / angle < 1)
 		{
-			if (DensField[index] > 0)
+			if (LiquidField[index] > 0)
 			{
 				cell current = Cells[index];
 				float a1 = angle - slope.y;
 				float a2 = slope.y - (angle - 3.14159265f / 4.f);
 				float proportion1 = a1 / (a1 + a2);
 				float proportion2 = a2 / (a1 + a2);
-				float x1 = CalculateDensity(direction[l], current, index);
-				float x2 = CalculateDensity(direction[l + 1], current, index);
+				float x1 = CalculateLiquidAmount(direction[l], current, index);
+				float x2 = CalculateLiquidAmount(direction[l + 1], current, index);
 				float outflow1 = x1 * clamp(proportion1, 0, 1);
 				float outflow2 = x2 * clamp(proportion2, 0, 1);
 				float amount1 = D1 / D2;
@@ -358,7 +358,7 @@ void CalculateD8(uint3 id : SV_DispatchThreadID)
 	cell current = Cells[index];
 	if (Cells[index].idPosition == -1)
 	{
-		DensField[index] = 0;
+		LiquidField[index] = 0;
 		return;
 	}
 	int idx = CalculateDirectionD4(index, index);
@@ -376,9 +376,9 @@ void CalculateD8(uint3 id : SV_DispatchThreadID)
 	{
 		amount = D1 / D2;
 	}
-	if (DensField[index] > 0)
+	if (LiquidField[index] > 0)
 	{
-		float x = CalculateDensity(idx, current, index);
+		float x = CalculateLiquidAmount(idx, current, index);
 		Cells[idx].inflow += x * amount;
 		Cells[index].outflow += x * amount;
 	}
@@ -394,7 +394,7 @@ void CalculateD4(uint3 id : SV_DispatchThreadID)
 	cell current = Cells[index];
 	if (Cells[index].idPosition == -1)
 	{
-		DensField[index] = 0;
+		LiquidField[index] = 0;
 		return;
 	}
 	int idx = CalculateDirectionD4(index, index);
@@ -406,9 +406,9 @@ void CalculateD4(uint3 id : SV_DispatchThreadID)
 	float2 t1 = float2(PositionAll[idx].x, PositionAll[idx].z) -
 		float2(PositionAll[index].x, PositionAll[index].z);
 	float amount = 1;
-	if (DensField[index] > 0)
+	if (LiquidField[index] > 0)
 	{
-		float x = CalculateDensity(idx, current, index);
+		float x = CalculateLiquidAmount(idx, current, index);
 		Cells[idx].inflow += x * amount;
 		Cells[index].outflow += x * amount;
 	}
@@ -488,11 +488,11 @@ int CalculateDirectionD16(int index, int currentLowest)
 	return id;
 }
 
-float CalculateDensity(int other, cell current, int index)
+float CalculateLiquidAmount(int other, cell current, int index)
 {
-	float diff = abs((current.height + DensField[index]) - (Cells[other].height + DensField[other])) * SpeedFlow;
-	//float d = DensField[index] - diff;
-	//if (d < 0) d = DensField[index]; else d = diff;
+	float diff = abs((current.height + LiquidField[index]) - (Cells[other].height + LiquidField[other])) * SpeedFlow;
+	//float d = LiquidField[index] - diff;
+	//if (d < 0) d = LiquidField[index]; else d = diff;
 	//Cells[other].inflow += diff;
 	return diff;
 }

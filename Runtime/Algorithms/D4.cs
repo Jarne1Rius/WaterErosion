@@ -13,7 +13,7 @@ public class D4 : Grid
     private int m_KernelDirection = 0;
     private int m_SizeForShader = 0;
 
-    public void SetParameters(ComputeShader shader, string pathToWrite, float abrasion, float solubility, float deepWaterCutOff, float speedFlow)
+    public void SetParameters(ComputeShader shader, string pathToWrite, float abrasion, float solubility, float deepWaterCutOff, float speedFlow, bool showTime)
     {
         Shader = shader;
         Path = pathToWrite;
@@ -21,6 +21,7 @@ public class D4 : Grid
         Solubility = solubility;
         DeepWaterCutoff = deepWaterCutOff;
         SpeedFlow = speedFlow;
+        ShowTime = showTime;
     }
     public override void Init(List<List<AlgorithmTypeFlow.Point>> vectors)
     {
@@ -28,13 +29,13 @@ public class D4 : Grid
         base.Init(vectors);
 
         m_KernelErosion = Shader.FindKernel("Erosion");
-        Shader.SetBuffer(m_KernelErosion, "DensField", WaterBuffer);
+        Shader.SetBuffer(m_KernelErosion, "LiquidField", WaterBuffer);
         Shader.SetBuffer(m_KernelErosion, "Position", PositionBuffer);
         Shader.SetBuffer(m_KernelErosion, "Cells", CellBuffer);
         Shader.SetBuffer(m_KernelErosion, "PositionWater", PositionWaterBuffer);
 
         m_KernelDirection = Shader.FindKernel("CalculateD4");
-        Shader.SetBuffer(m_KernelDirection, "DensField", WaterBuffer);
+        Shader.SetBuffer(m_KernelDirection, "LiquidField", WaterBuffer);
         Shader.SetBuffer(m_KernelDirection, "PositionAll", PositionAllBuffer);
         Shader.SetBuffer(m_KernelDirection, "Cells", CellBuffer);
         m_SizeForShader = Size + BoundSize * 2;
@@ -64,7 +65,8 @@ public class D4 : Grid
             DurationUpdate += stopwatch.Elapsed;
             if (time > 1)
             {
-                Debug.Log(stopwatch.Elapsed + " - " + stopwatch.ElapsedMilliseconds);
+                if (ShowTime)
+                    Debug.Log(stopwatch.Elapsed + " - " + stopwatch.ElapsedMilliseconds);
                 time--;
             }
 

@@ -56,6 +56,7 @@ public class Grid : MonoBehaviour
     protected ComputeBuffer PositionWaterBuffer = null;
     protected ComputeBuffer PositionAllBuffer = null;
 
+    protected bool ShowTime = false;
     protected ComputeShader Shader = null;
     protected string Path = "Assets/Test.txt";
     protected float Abrasion = 0.08f;
